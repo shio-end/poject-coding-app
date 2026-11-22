@@ -2,6 +2,7 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -30,3 +31,24 @@ jobs:
           name: Mobile-Code-Workbench-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Mobile-Code-Workbench-APK
+      - name: Publish the debug APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mv app-debug.apk Mobile-Code-Workbench.apk
+          gh release create "$RELEASE_TAG" Mobile-Code-Workbench.apk \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+            --title "Mobile Code Workbench $RELEASE_TAG" \
+            --notes "Android test build for Android 8.0 or later. Debug-signed and built by GitHub Actions."
