@@ -31,7 +31,7 @@ let pendingSave;
 const blank = makeDoc('empty.txt', '');
 const editor = CodeMirror($('editor'), {
   lineNumbers: true, indentUnit: 2, tabSize: 2, lineWrapping: true,
-  autoCloseBrackets: true, matchBrackets: true, inputStyle: 'contenteditable',
+  autoCloseBrackets: true, matchBrackets: true, inputStyle: 'textarea',
   extraKeys: {
     'Ctrl-Space': suggest,
     'Ctrl-F': () => { panel('search'); $('query').focus(); },
