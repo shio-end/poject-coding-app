@@ -1,0 +1,29 @@
+:root { color-scheme: dark; --base: #151b22; --panel: #202a33; --text: #e4edf4; --muted: #a7b7c6; --border: #354450; --accent: #8ee5c7; }
+* { box-sizing: border-box; }
+body { height: 100dvh; margin: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--base); color: var(--text); font: 14px system-ui, sans-serif; }
+body.light { color-scheme: light; --base: #f3f7f7; --panel: #fff; --text: #15232a; --muted: #405762; --border: #b7c9ce; --accent: #9beed4; }
+[hidden] { display: none !important; }
+.top, .tools, .keys, footer, .row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; }
+.top { justify-content: space-between; background: var(--panel); padding: 8px 12px; }
+.top strong { font-size: 19px; letter-spacing: -.025em; }
+button, input, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 7px; min-height: 36px; padding: 5px 10px; }
+button { flex: none; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #46bda4; outline-offset: -2px; }
+.primary, button[aria-pressed="true"], .selected { background: var(--accent); color: #102522; border-color: var(--accent); }
+.tools, .keys, #tabs { overflow-x: auto; flex: none; scrollbar-width: thin; }
+.panel { max-height: 34vh; padding: 8px 10px; overflow: auto; border-block: 1px solid var(--border); background: var(--panel); }
+.row { flex-wrap: wrap; padding-inline: 0; }
+ul { padding: 0; margin: 4px 0; list-style: none; }
+li button { width: 100%; text-align: left; border: 0; overflow-wrap: anywhere; }
+label { display: inline-flex; align-items: center; gap: 8px; margin: 3px 8px 3px 0; }
+input { min-width: 0; max-width: 47vw; }
+#tabs { display: flex; gap: 4px; padding: 5px 10px; border-top: 1px solid var(--border); }
+.tab { display: flex; flex: none; align-items: center; }
+.tab button:first-child { border-radius: 7px 0 0 7px; }
+.tab button:last-child { border-radius: 0 7px 7px 0; padding: 3px 8px; }
+#editor { min-height: 0; flex: 1; border-block: 1px solid var(--border); }
+.CodeMirror { height: 100%; }
+footer { justify-content: space-between; min-height: 28px; color: var(--muted); font-size: 12px; }
+#position { flex: none; }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 12px; }
+dialog::backdrop { background: #0009; }

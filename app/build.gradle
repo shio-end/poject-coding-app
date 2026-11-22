@@ -1,0 +1,15 @@
+plugins {
+    id 'com.android.application' version '8.9.2'
+}
+android {
+    namespace 'com.shioend.mobileworkbench'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.shioend.mobileworkbench'
+        minSdk 26
+        // Use the platform's legacy inset behavior for this sideloadable build.
+        targetSdk 34
+        versionCode 1
+        versionName '0.1.0'
+    }
+}

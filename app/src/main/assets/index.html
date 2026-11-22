@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<title>Mobile Code Workbench</title>
+<link rel="stylesheet" href="vendor/codemirror.css">
+<link rel="stylesheet" href="vendor/material-darker.css">
+<link rel="stylesheet" href="vendor/show-hint.css">
+<link rel="stylesheet" href="workbench.css">
+</head>
+<body>
+<header class="top"><strong>Workbench</strong><button id="run" class="primary">▶ Run HTML</button></header>
+<nav class="tools" aria-label="Workspace tools">
+<button data-panel="files">Files</button><button data-panel="search">Search</button>
+<button data-panel="project">Project</button><button data-panel="settings">Settings</button>
+</nav>
+<section id="files" class="panel" hidden>
+<div class="row"><button id="new">New file</button><button id="rename">Rename</button><button id="delete">Delete</button></div>
+<ul id="tree"></ul>
+</section>
+<section id="search" class="panel" hidden>
+<label>Find <input id="query" type="search" autocomplete="off"></label>
+<label>Replace <input id="replacement" autocomplete="off"></label>
+<div class="row"><button id="find">Next</button><button id="replace">Replace all in file</button><button id="findProject">Search project</button></div>
+<ul id="results"></ul>
+</section>
+<section id="project" class="panel" hidden>
+<div class="row"><button id="import">Import file or ZIP</button><button id="export">Export ZIP</button><button id="save">Export file</button></div>
+</section>
+<section id="settings" class="panel" hidden>
+<label>Theme <select id="theme"><option value="material-darker">Dark</option><option value="default">Light</option></select></label>
+<label>Font size <input id="font" type="number" min="12" max="28" value="15"></label>
+</section>
+<div id="tabs" aria-label="Open files"></div>
+<main id="editor" aria-label="Code editor"></main>
+<nav class="keys" aria-label="Coding keys">
+<button id="indent">Tab</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="hint">Suggest</button>
+<button data-text="{">{</button><button data-text="}">}</button><button data-text="(">(</button><button data-text=")">)</button>
+<button data-text="[">[</button><button data-text="]">]</button><button data-text=";">;</button><button data-text="=">=</button><button data-text="&lt;">&lt;</button><button data-text="&gt;">&gt;</button>
+</nav>
+<footer><span id="status" role="status"></span><span id="position"></span></footer>
+<dialog id="fileDialog">
+<form method="dialog">
+<label id="fileLabel" for="fileName">File path</label>
+<input id="fileName" required autocomplete="off" placeholder="src/main.js">
+<div class="row"><button value="cancel" formnovalidate>Cancel</button><button value="save" class="primary">Save</button></div>
+</form>
+</dialog>
+<script src="vendor/codemirror.js"></script>
+<script src="vendor/xml.js"></script><script src="vendor/javascript.js"></script><script src="vendor/css.js"></script><script src="vendor/htmlmixed.js"></script>
+<script src="vendor/python.js"></script><script src="vendor/clike.js"></script><script src="vendor/markdown.js"></script>
+<script src="vendor/shell.js"></script><script src="vendor/sql.js"></script><script src="vendor/yaml.js"></script>
+<script src="vendor/closebrackets.js"></script><script src="vendor/matchbrackets.js"></script>
+<script src="vendor/show-hint.js"></script><script src="vendor/anyword-hint.js"></script>
+<script src="workbench.js"></script>
+</body>
+</html>
