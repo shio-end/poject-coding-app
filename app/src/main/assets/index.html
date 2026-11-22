@@ -4,17 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
-<title>Mobile Code Workbench</title>
+<title>HexFlow</title>
 <link rel="stylesheet" href="vendor/codemirror.css">
 <link rel="stylesheet" href="vendor/material-darker.css">
 <link rel="stylesheet" href="vendor/show-hint.css">
 <link rel="stylesheet" href="workbench.css">
 </head>
 <body>
-<header class="top"><strong>Workbench</strong><button id="run" class="primary">▶ Run HTML</button></header>
+<div class="splash" id="splash" aria-hidden="true">
+  <span class="app-mark"></span><strong>HexFlow</strong><small>ShioliEnterprise @shi-end</small>
+</div>
+<header class="top">
+  <div class="brand"><span class="app-mark" aria-hidden="true"></span><strong>HexFlow</strong></div>
+  <div class="header-actions"><button id="palette" aria-label="Command palette" title="Command palette">⌘</button><button id="run" class="primary">▶ Run</button></div>
+</header>
+<div class="viewbar">
+  <div class="view-switch" role="group" aria-label="Workspace view">
+    <button data-view="editor" aria-pressed="true">Code</button><button data-view="split" aria-pressed="false">Split</button><button data-view="preview" aria-pressed="false">Preview</button>
+  </div>
+  <label class="entry"><span class="sr-only">Preview page</span><select id="entry" aria-label="Preview page"></select></label>
+</div>
 <nav class="tools" aria-label="Workspace tools">
 <button data-panel="files">Files</button><button data-panel="search">Search</button>
-<button data-panel="project">Project</button><button data-panel="settings">Settings</button>
+<button data-panel="problems">Problems <span id="problemCount"></span></button><button data-panel="outline">Outline</button><button data-panel="project">Project</button><button data-panel="settings">Settings</button>
 </nav>
 <section id="files" class="panel" hidden>
 <div class="row"><button id="new">New file</button><button id="rename">Rename</button><button id="delete">Delete</button></div>
@@ -26,26 +38,44 @@
 <div class="row"><button id="find">Next</button><button id="replace">Replace all in file</button><button id="findProject">Search project</button></div>
 <ul id="results"></ul>
 </section>
+<section id="problems" class="panel" hidden>
+<div class="row"><button id="check">Check file</button><button id="checkProject">Check project</button></div>
+<ul id="issues"></ul>
+</section>
+<section id="outline" class="panel" hidden><ul id="symbols"></ul></section>
 <section id="project" class="panel" hidden>
 <div class="row"><button id="import">Import file or ZIP</button><button id="export">Export ZIP</button><button id="save">Export file</button></div>
 </section>
 <section id="settings" class="panel" hidden>
+<label><input id="autoCheck" type="checkbox" checked> Check while typing</label>
 <label>Theme <select id="theme"><option value="material-darker">Dark</option><option value="default">Light</option></select></label>
 <label>Font size <input id="font" type="number" min="12" max="28" value="15"></label>
 </section>
 <div id="tabs" aria-label="Open files"></div>
+<div id="breadcrumb" class="breadcrumb"></div>
 <main id="editor" aria-label="Code editor"></main>
 <nav class="keys" aria-label="Coding keys">
 <button id="indent">Tab</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="hint">Suggest</button>
 <button data-text="{">{</button><button data-text="}">}</button><button data-text="(">(</button><button data-text=")">)</button>
 <button data-text="[">[</button><button data-text="]">]</button><button data-text=";">;</button><button data-text="=">=</button><button data-text="&lt;">&lt;</button><button data-text="&gt;">&gt;</button>
 </nav>
-<footer><span id="status" role="status"></span><span id="position"></span></footer>
+<footer><span id="language"></span><span id="status" role="status"></span><span id="position"></span></footer>
 <dialog id="fileDialog">
 <form method="dialog">
 <label id="fileLabel" for="fileName">File path</label>
 <input id="fileName" required autocomplete="off" placeholder="src/main.js">
 <div class="row"><button value="cancel" formnovalidate>Cancel</button><button value="save" class="primary">Save</button></div>
+</form>
+</dialog>
+<dialog id="commandDialog">
+<label for="commandQuery">Command palette</label>
+<input id="commandQuery" type="search" autocomplete="off" placeholder="Type a command or file">
+<ul id="commands"></ul>
+</dialog>
+<dialog id="lineDialog">
+<form method="dialog">
+<label for="lineNumber">Go to line</label><input id="lineNumber" type="number" min="1" required>
+<div class="row"><button value="go" class="primary">Go</button><button value="cancel" formnovalidate>Cancel</button></div>
 </form>
 </dialog>
 <script src="vendor/codemirror.js"></script>
@@ -54,6 +84,10 @@
 <script src="vendor/shell.js"></script><script src="vendor/sql.js"></script><script src="vendor/yaml.js"></script>
 <script src="vendor/closebrackets.js"></script><script src="vendor/matchbrackets.js"></script>
 <script src="vendor/show-hint.js"></script><script src="vendor/anyword-hint.js"></script>
+<script src="vendor/simple.js"></script><script src="vendor/jsx.js"></script><script src="vendor/go.js"></script><script src="vendor/rust.js"></script><script src="vendor/ruby.js"></script>
+<script src="vendor/php.js"></script><script src="vendor/toml.js"></script><script src="vendor/dockerfile.js"></script>
+<script src="vendor/diff.js"></script><script src="vendor/swift.js"></script>
+<script src="diagnostics.js"></script>
 <script src="workbench.js"></script>
 </body>
 </html>

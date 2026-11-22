@@ -28,7 +28,7 @@ jobs:
       - run: gradle --no-daemon :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Mobile-Code-Workbench-APK
+          name: HexFlow-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
@@ -41,14 +41,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Mobile-Code-Workbench-APK
+          name: HexFlow-APK
       - name: Publish the debug APK
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          mv app-debug.apk Mobile-Code-Workbench.apk
-          gh release create "$RELEASE_TAG" Mobile-Code-Workbench.apk \
+          mv app-debug.apk HexFlow.apk
+          gh release create "$RELEASE_TAG" HexFlow.apk \
             --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
-            --title "Mobile Code Workbench $RELEASE_TAG" \
+            --title "HexFlow $RELEASE_TAG" \
             --notes "Android test build for Android 8.0 or later. Debug-signed and built by GitHub Actions."

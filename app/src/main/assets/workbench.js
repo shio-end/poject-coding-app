@@ -3,7 +3,7 @@
 const $ = id => document.getElementById(id);
 const storageKey = 'workbench.project.v1';
 const example = {
-  'index.html': '<!doctype html>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Workbench demo</title>\n<link rel="stylesheet" href="style.css">\n<h1>Hello, Workbench</h1>\n<button id="demo">Tap to test JavaScript</button>\n<script src="main.js"></script>\n',
+  'index.html': '<!doctype html>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>HexFlow demo</title>\n<link rel="stylesheet" href="style.css">\n<h1>Hello, HexFlow</h1>\n<button id="demo">Tap to test JavaScript</button>\n<script src="main.js"></script>\n',
   'style.css': 'body { font: 18px system-ui; padding: 24px; color: #153b3b; }\nbutton { padding: 12px; }\n',
   'main.js': "document.querySelector('#demo').onclick = () => {\n  console.log('The app is running.');\n  document.querySelector('h1').textContent = 'It works!';\n};\n"
 };
@@ -13,10 +13,14 @@ catch (error) { console.warn(error); }
 
 const documents = new Map();
 const modes = {
-  html: 'htmlmixed', htm: 'htmlmixed', js: 'javascript', ts: 'text/typescript',
+  html: 'htmlmixed', htm: 'htmlmixed', js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  jsx: 'jsx', ts: 'text/typescript', tsx: 'text/typescript',
   json: 'application/json', css: 'css', py: 'python', java: 'text/x-java',
   c: 'text/x-csrc', cpp: 'text/x-c++src', md: 'markdown', sh: 'shell',
-  sql: 'text/x-sql', xml: 'xml', svg: 'xml', yaml: 'yaml', yml: 'yaml'
+  sql: 'text/x-sql', xml: 'xml', svg: 'xml', yaml: 'yaml', yml: 'yaml',
+  kt: 'text/x-kotlin', cs: 'text/x-csharp', h: 'text/x-csrc', hpp: 'text/x-c++src',
+  go: 'go', rs: 'rust', rb: 'ruby', php: 'application/x-httpd-php',
+  toml: 'toml', dockerfile: 'dockerfile', diff: 'diff', patch: 'diff', swift: 'swift'
 };
 function makeDoc(path, content) {
   return new CodeMirror.Doc(content, modes[path.split('.').pop().toLowerCase()] || 'text/plain');
@@ -28,14 +32,24 @@ for (const [path, content] of Object.entries(previous.files || example)) {
 let tabs = (previous.tabs || ['index.html']).filter(path => documents.has(path));
 let active = null;
 let pendingSave;
+let previewTimer;
+let checkerTimer;
+let viewMode = 'editor';
+let previewEntry = previous.previewEntry || '';
+let checkGeneration = 0;
+let lastPreview = '';
 const blank = makeDoc('empty.txt', '');
 const editor = CodeMirror($('editor'), {
   lineNumbers: true, indentUnit: 2, tabSize: 2, lineWrapping: true,
   autoCloseBrackets: true, matchBrackets: true, inputStyle: 'textarea',
+  gutters: ['CodeMirror-linenumbers', 'diagnostic-gutter'],
   extraKeys: {
     'Ctrl-Space': suggest,
     'Ctrl-F': () => { panel('search'); $('query').focus(); },
-    'Ctrl-S': () => { persist(); }
+    'Ctrl-S': persist,
+    'Ctrl-P': openPalette,
+    'Ctrl-G': goToLine,
+    'Ctrl-Enter': runActive
   }
 });
 
@@ -52,7 +66,8 @@ function persist() {
   clearTimeout(pendingSave);
   try {
     localStorage.setItem(storageKey, JSON.stringify({
-      files: contents(), tabs, active, theme: $('theme').value, font: $('font').value
+      files: contents(), tabs, active, theme: $('theme').value, font: $('font').value,
+      previewEntry, autoCheck: $('autoCheck').checked
     }));
     status('Saved on this device');
   } catch (error) {
@@ -94,6 +109,9 @@ function render() {
     $('tabs').append(tab);
   }
   for (const id of ['rename', 'delete', 'save', 'find', 'replace']) $(id).disabled = !active;
+  $('breadcrumb').textContent = active ? active.split('/').join('  ›  ') : 'No file open';
+  $('language').textContent = active ? HexDiagnostics.extension(active).toUpperCase() : '';
+  updatePreviewEntries();
   position();
 }
 function open(path) {
@@ -104,6 +122,9 @@ function open(path) {
   editor.setOption('readOnly', !active);
   render();
   persist();
+  scheduleCheck();
+  queuePreview();
+  if (!$('outline').hidden) renderOutline();
 }
 function position() {
   const {line, ch} = editor.getCursor();
@@ -115,6 +136,7 @@ function panel(id) {
     control.setAttribute('aria-pressed', String(selected));
     $(control.dataset.panel).hidden = !selected;
   }
+  if (id === 'outline') renderOutline();
   editor.refresh();
 }
 function editPath(path) {
@@ -174,6 +196,9 @@ editor.on('change', () => {
   clearTimeout(pendingSave);
   status('Saving…');
   pendingSave = setTimeout(persist, 250);
+  scheduleCheck();
+  queuePreview();
+  if (!$('outline').hidden) renderOutline();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
 for (const control of document.querySelectorAll('[data-panel]')) {
@@ -234,13 +259,232 @@ $('font').onchange = appearance;
 $('import').onclick = () => AndroidBridge.pickFile();
 $('export').onclick = () => AndroidBridge.exportProject(JSON.stringify(contents()));
 $('save').onclick = () => { if (active) AndroidBridge.exportFile(active.split('/').pop(), editor.getValue()); };
-$('run').onclick = () => {
-  const isHtml = path => /\.html?$/i.test(path || '');
-  const entry = isHtml(active) ? active : documents.has('index.html') ? 'index.html' : [...documents.keys()].find(isHtml);
-  if (!entry) { status('Create an HTML file to run a preview.'); return; }
+function updatePreviewEntries() {
+  const entries = [...documents.keys()].filter(path => /\.html?$/i.test(path)).sort();
+  if (!entries.includes(previewEntry)) previewEntry = entries.includes('index.html') ? 'index.html' : entries[0] || '';
+  $('entry').replaceChildren(...(entries.length ? entries : ['']).map(path => {
+    const option = document.createElement('option');
+    option.value = path;
+    option.textContent = path || 'No HTML page';
+    return option;
+  }));
+  $('entry').value = previewEntry;
+  $('entry').disabled = !previewEntry;
+  for (const control of document.querySelectorAll('[data-view]:not([data-view="editor"])')) {
+    control.disabled = !previewEntry;
+  }
+  if (!previewEntry && viewMode !== 'editor') setView('editor');
+}
+function queuePreview(immediate = false) {
+  clearTimeout(previewTimer);
+  if (viewMode === 'editor' || !previewEntry) return;
+  const update = () => {
+    const json = JSON.stringify(contents());
+    if (json.length > 2 * 1024 * 1024) {
+      setView('editor');
+      status('Live Preview supports projects up to 2 MB of text.');
+      return;
+    }
+    const fingerprint = JSON.stringify([viewMode, previewEntry, json]);
+    if (fingerprint === lastPreview) return;
+    lastPreview = fingerprint;
+    AndroidBridge.preview(previewEntry, json, viewMode === 'split');
+  };
+  if (immediate) update();
+  else previewTimer = setTimeout(update, 420);
+}
+function setView(mode, closeNative = true) {
+  if (mode !== 'editor' && !previewEntry) {
+    status('Add an HTML file before opening Live Preview.');
+    return;
+  }
+  viewMode = mode;
+  for (const button of document.querySelectorAll('[data-view]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.view === mode));
+  }
+  if (mode === 'editor') {
+    clearTimeout(previewTimer);
+    lastPreview = '';
+    if (closeNative) AndroidBridge.closeViewer();
+    editor.refresh();
+  } else {
+    panel(null);
+    queuePreview(true);
+  }
+}
+function runActive() {
+  const extension = HexDiagnostics.extension(active);
+  if (extension === 'html' || extension === 'htm') {
+    previewEntry = active;
+    $('entry').value = active;
+    persist();
+    setView('preview');
+    return;
+  }
+  const runtime = {js: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', py: 'python', sql: 'sql'}[extension];
+  if (!runtime) {
+    status('Run supports HTML, JavaScript, TypeScript, Python and SQL.');
+    return;
+  }
+  const source = editor.getValue();
+  if (source.length > 300000) { status('Run supports scripts up to 300,000 characters.'); return; }
+  setView('editor');
   persist();
-  AndroidBridge.preview(entry, JSON.stringify(contents()));
-};
+  AndroidBridge.runCode(runtime, source);
+}
+function navigateTo(path, line, column = 1) {
+  open(path);
+  panel(null);
+  const position = {line: line - 1, ch: column - 1};
+  editor.setCursor(position);
+  editor.scrollIntoView(position, 30);
+  editor.focus();
+}
+function renderOutline() {
+  const list = $('symbols');
+  list.replaceChildren();
+  const matcher = /^\s*(?:export\s+)?(?:async\s+)?(?:function|class|def|interface|enum|func|struct|trait|fn|module)\s+([\w$]+)|^(#{1,6}\s+.+)|^\s*<(h[1-6])(?:>|\s)([^<]*)/i;
+  let count = 0;
+  editor.eachLine(line => {
+    const match = matcher.exec(line.text);
+    if (!match || count >= 100) return;
+    const number = editor.getLineNumber(line) + 1;
+    listItem(list, button((match[1] || match[2] || match[4] || match[3]) + '  ·  ' + number,
+      () => navigateTo(active, number)));
+    count++;
+  });
+  if (!count) list.textContent = 'No headings or declarations found.';
+}
+function scheduleCheck() {
+  clearTimeout(checkerTimer);
+  checkGeneration++;
+  editor.clearGutter('diagnostic-gutter');
+  $('problemCount').textContent = '';
+  $('issues').replaceChildren();
+  if (active && $('autoCheck').checked) checkerTimer = setTimeout(() => checkFiles(false), 550);
+}
+async function checkFiles(project, explicit = false) {
+  clearTimeout(checkerTimer);
+  const token = ++checkGeneration;
+  const files = project ? [...documents] : active ? [[active, editor.getDoc()]] : [];
+  let checked = 0;
+  let skipped = 0;
+  const results = [];
+  const selected = active;
+  for (const [path, doc] of files) {
+    if (token !== checkGeneration) return;
+    const text = doc.getValue();
+    if (text.length > 300000 || checked >= 60 || !HexDiagnostics.supported.has(HexDiagnostics.extension(path))) {
+      skipped++;
+      continue;
+    }
+    try {
+      const issues = await HexDiagnostics.inspect(path, text);
+      if (issues) {
+        checked++;
+        results.push(...issues.slice(0, 60).map(issue => ({path, ...issue})));
+      }
+    } catch (error) {
+      skipped++;
+    }
+  }
+  if (token !== checkGeneration) return;
+  const list = $('issues');
+  list.replaceChildren();
+  $('problemCount').textContent = results.length ? String(results.length) : '';
+  editor.clearGutter('diagnostic-gutter');
+  for (const issue of results.slice(0, 200)) {
+    listItem(list, button(issue.path + ':' + issue.line + ':' + issue.column + '  ' + issue.message,
+      () => navigateTo(issue.path, issue.line, issue.column)));
+    if (issue.path === selected && issue.line <= editor.lineCount()) {
+      const marker = document.createElement('span');
+      marker.className = 'diagnostic-marker';
+      marker.textContent = issue.severity === 'warning' ? '▲' : '●';
+      marker.title = issue.message;
+      marker.onclick = () => panel('problems');
+      editor.setGutterMarker(issue.line - 1, 'diagnostic-gutter', marker);
+    }
+  }
+  const summary = document.createElement('li');
+  summary.textContent = checked ? checked + ' checked · ' + results.length + ' reported' :
+    active && HexDiagnostics.extension(active) === 'sql' ? 'Run SQL to check it against a temporary SQLite database.' :
+    'No checker for the selected file.';
+  if (project && skipped) summary.textContent += ' · ' + skipped + ' skipped';
+  list.prepend(summary);
+  if (explicit) status(summary.textContent);
+}
+function goToLine() {
+  if (!active) return;
+  const dialog = $('lineDialog');
+  $('lineNumber').max = editor.lineCount();
+  $('lineNumber').value = editor.getCursor().line + 1;
+  dialog.returnValue = '';
+  dialog.onclose = () => {
+    if (dialog.returnValue === 'go') navigateTo(active, Number($('lineNumber').value));
+  };
+  dialog.showModal();
+  $('lineNumber').select();
+}
+function formatJson() {
+  if (HexDiagnostics.extension(active) !== 'json') {
+    status('Format is currently available for JSON.');
+    return;
+  }
+  try {
+    const formatted = JSON.stringify(JSON.parse(editor.getValue()), null, 2) + '\n';
+    const end = editor.lastLine();
+    editor.replaceRange(formatted, {line: 0, ch: 0}, {line: end, ch: editor.getLine(end).length}, '+input');
+    persist();
+  } catch (error) {
+    panel('problems');
+    checkFiles(false, true);
+  }
+}
+function openPalette() {
+  const dialog = $('commandDialog');
+  const input = $('commandQuery');
+  const actions = [
+    ['New file', () => editPath(null)], ['Go to line', goToLine], ['Format JSON', formatJson],
+    ['Run current file', runActive], ['Open Live Preview', () => setView('preview')],
+    ['Open split view', () => setView('split')], ['Check project', () => { panel('problems'); checkFiles(true, true); }],
+    ['Export project ZIP', () => $('export').click()], ['Show outline', () => panel('outline')]
+  ];
+  for (const path of documents.keys()) actions.push([path, () => { open(path); panel(null); }]);
+  function renderCommands() {
+    $('commands').replaceChildren();
+    const query = input.value.trim().toLowerCase();
+    for (const [label, action] of actions.filter(([label]) => label.toLowerCase().includes(query)).slice(0, 50)) {
+      listItem($('commands'), button(label, () => { dialog.close(); action(); }));
+    }
+  }
+  input.value = '';
+  input.oninput = renderCommands;
+  input.onkeydown = event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const first = $('commands').querySelector('button');
+      if (first) first.click();
+    }
+  };
+  renderCommands();
+  dialog.showModal();
+  input.focus();
+}
+window.viewerClosed = () => setView('editor', false);
+$('entry').onchange = () => { previewEntry = $('entry').value; persist(); queuePreview(true); };
+for (const control of document.querySelectorAll('[data-view]')) {
+  control.onclick = () => setView(control.dataset.view);
+}
+$('palette').onclick = openPalette;
+$('run').onclick = runActive;
+$('check').onclick = () => checkFiles(false, true);
+$('checkProject').onclick = () => checkFiles(true, true);
+$('autoCheck').checked = previous.autoCheck !== false;
+$('autoCheck').onchange = () => { persist(); scheduleCheck(); };
+const icon = new Image();
+icon.onload = () => document.body.classList.add('has-art');
+icon.src = 'icon.webp';
+setTimeout(() => { $('splash').hidden = true; }, 1000);
 window.importProjectFiles = files => {
   let first;
   let skipped = 0;

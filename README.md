@@ -1,20 +1,34 @@
-# Mobile Code Workbench
+# HexFlow
 
-An offline Android code editor with a touch-first workspace, built with Android WebView and CodeMirror. Requires Android 8.0 or later and a current Android System WebView.
+<img src="icon/app-icon.png" alt="HexFlow cover and app artwork" width="168">
 
-- Edit several files in tabs with syntax highlighting, line numbers, bracket matching, undo/redo, and word suggestions.
-- Create, rename, and delete files. Paths such as `src/main.js` group files by directory in exported ZIPs.
-- Find and replace in a file or search for matching lines across the project.
-- Import UTF-8 text or a project ZIP through Android's file picker. Imports skip duplicate paths and accept up to 2 MiB of input after decompression. Export any open file or the entire project.
-- Run an HTML entry point with local HTML, CSS and JavaScript. Open Console to inspect JavaScript logs and errors.
-- The workspace is saved on the device. Export a ZIP before clearing app data.
+An offline Android code workspace for Android 8.0 and later, with a touch-first editor and Live Preview. Created by **ShioliEnterprise @shi-end**.
 
-The preview runs offline. Native terminals, Git operations, language servers, desktop extensions, and native language runtimes are outside this version. Suggestions use words from the current file.
+## Edit and preview
 
-## Build and install
+- Choose **Code**, **Split**, or **Preview**. Pick the HTML entry page to render. In Split view, changes refresh the isolated preview after a short pause. The Console shows browser JavaScript logs and errors.
+- Edit files in tabs with line numbers, syntax highlighting, matching brackets, suggestions based on words in the current file, project search, and find and replace.
+- Open the command palette with **⌘** or **Ctrl+P**. It includes quick file opening, Go to Line, JSON formatting, project checking, and ZIP export. Outline lists recognized declarations and headings.
+- Import UTF-8 files and project ZIPs from Android's file picker. Export individual files or an entire project. The workspace is saved locally.
 
-Run **Build Android APK** in GitHub Actions. Download **Mobile-Code-Workbench-APK** from the run's artifacts, extract it, and install `app-debug.apk` on Android. This build is debug-signed for testing.
+## Run and check
 
-For a local build, install JDK 17, Gradle 8.11.1, Android SDK Platform 35 and Android Build Tools 35.0.0. Then run `gradle :app:assembleDebug`.
+| Format | Run | Check |
+| --- | --- | --- |
+| HTML plus local CSS and JavaScript | Live Preview | HTML lint, CSS parser, and JavaScript syntax |
+| JavaScript and TypeScript | Standalone scripts with console output | JavaScript syntax and TypeScript syntax plus selected single-file type errors |
+| Python | Skulpt runtime with supported Python 3 syntax and libraries | Skulpt syntax parser |
+| SQL | An isolated in-memory SQLite database | Run to see SQLite errors and query output |
+| JSON and YAML | Data files | Syntax and structure |
 
-The bundled CodeMirror 5 assets are distributed under the license in `app/src/main/assets/vendor/LICENSE`.
+Standalone scripts run in an offline worker with a Stop control and a 12-second limit. Node packages, imports between standalone scripts, interactive stdin, CPython packages, system commands, and production web servers require other runtimes. The preview serves local project files and blocks network access. A successful check only covers the rules of the selected checker.
+
+Other UTF-8 file types can be edited. There is syntax highlighting for several additional formats, including Go, Rust, Kotlin, Swift, Java, C and C++. Desktop VS Code extensions, Git, a native terminal, debugger, and arbitrary compiler runtimes are outside this release.
+
+## Build
+
+Download **HexFlow.apk** from GitHub Releases. Tagged builds publish a debug-signed APK for testing. Each hosted build can use a different debug key, so export your project ZIP before replacing an older build if Android requires uninstalling it first.
+
+For a local build, use JDK 17, Gradle 8.11.1, Android SDK Platform 35, and Android Build Tools 35.0.0. Run `gradle :app:assembleDebug`.
+
+CodeMirror's license is in `app/src/main/assets/vendor/LICENSE`. Other bundled licenses are under `app/src/main/assets/vendor/licenses`.

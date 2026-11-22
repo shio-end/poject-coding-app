@@ -18,7 +18,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
-import android.widget.FrameLayout;
+import android.content.res.Configuration;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -49,10 +49,17 @@ public final class MainActivity extends Activity {
     private static final int SAVE_FILE = 2;
     private static final int LIMIT = 2 * 1024 * 1024;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private FrameLayout root;
+    private static final String RUNNER_HOST = "runner.workbench.local";
+    private LinearLayout root;
     private WebView editor;
     private WebView preview;
     private LinearLayout previewPanel;
+    private volatile JSONObject previewFiles = new JSONObject();
+    private TextView previewTitle;
+    private TextView previewLog;
+    private int revision;
+    private boolean runtime;
+    private boolean split;
     private PendingExport pendingExport;
 
     private static final class PendingExport {
@@ -69,7 +76,8 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.rgb(21, 27, 34));
         getWindow().setNavigationBarColor(Color.rgb(21, 27, 34));
-        root = new FrameLayout(this);
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
         setContentView(root);
         editor = newWebView();
         editor.getSettings().setDomStorageEnabled(true);
@@ -88,7 +96,7 @@ public final class MainActivity extends Activity {
                 return true;
             }
         });
-        root.addView(editor);
+        root.addView(editor, new LinearLayout.LayoutParams(-1, -1));
         editor.loadUrl("https://" + EDITOR_HOST + "/index.html");
     }
 
@@ -139,11 +147,19 @@ public final class MainActivity extends Activity {
         }
 
         @android.webkit.JavascriptInterface public void exportProject(String files) {
-            runOnUiThread(() -> export("workbench-project.zip", "application/zip", new PendingExport(files, true)));
+            runOnUiThread(() -> export("HexFlow-project.zip", "application/zip", new PendingExport(files, true)));
         }
 
-        @android.webkit.JavascriptInterface public void preview(String entry, String files) {
-            runOnUiThread(() -> openPreview(entry, files));
+        @android.webkit.JavascriptInterface public void preview(String entry, String files, boolean splitView) {
+            runOnUiThread(() -> openPreview(entry, files, splitView));
+        }
+
+        @android.webkit.JavascriptInterface public void closeViewer() {
+            runOnUiThread(() -> closePreview(false));
+        }
+
+        @android.webkit.JavascriptInterface public void runCode(String language, String source) {
+            runOnUiThread(() -> openRunner(language, source));
         }
     }
 
@@ -279,83 +295,168 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private void openPreview(String entry, String json) {
-        if (preview != null || !validPath(entry)) return;
+    private void openPreview(String entry, String json, boolean splitView) {
+        if (!validPath(entry)) return;
         JSONObject files;
         try { files = new JSONObject(json); }
         catch (org.json.JSONException error) { return; }
         if (!files.has(entry)) return;
 
+        if (preview == null || runtime) createViewer(false);
+        previewFiles = files;
+        boolean hideKeyboard = !splitView && editor.getVisibility() == View.VISIBLE;
+        split = splitView;
+        layoutViewer();
+        if (hideKeyboard) hideKeyboard();
+        previewTitle.setText("LIVE  ·  " + entry);
+        previewLog.setText("JavaScript console\n");
+        preview.loadUrl("https://" + PREVIEW_HOST + "/" + Uri.encode(entry, "/") + "?revision=" + (++revision));
+    }
+
+    private void openRunner(String language, String source) {
+        createViewer(true);
+        previewTitle.setText(language.toUpperCase(Locale.ROOT) + " OUTPUT");
+        split = false;
+        layoutViewer();
+        hideKeyboard();
+        final String command = "window.runCode(" + JSONObject.quote(language) + "," + JSONObject.quote(source) + ")";
+        preview.setWebViewClient(new LocalClient(RUNNER_HOST) {
+            private boolean started;
+
+            @Override WebResourceResponse response(String path) throws IOException {
+                if (!"runner.html".equals(path) && !"runner.js".equals(path) && !"runner-worker.js".equals(path)
+                        && !path.startsWith("vendor/")) throw new IOException("Unknown runner resource");
+                String scripts = "runner-worker.js".equals(path) ? "'self' 'unsafe-eval'" : "'self'";
+                return new WebResourceResponse(mime(path), "UTF-8", 200, "OK", Collections.singletonMap(
+                    "Content-Security-Policy", "default-src 'none'; script-src " + scripts +
+                        "; worker-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'"),
+                    getAssets().open(path));
+            }
+
+            @Override public void onPageFinished(WebView view, String url) {
+                if (!started && url.equals("https://" + RUNNER_HOST + "/runner.html")) {
+                    started = true;
+                    view.evaluateJavascript(command, null);
+                }
+            }
+        });
+        preview.loadUrl("https://" + RUNNER_HOST + "/runner.html");
+    }
+
+    private void createViewer(boolean runner) {
+        closePreview(false);
+        runtime = runner;
         previewPanel = new LinearLayout(this);
         previewPanel.setOrientation(LinearLayout.VERTICAL);
-        previewPanel.setBackgroundColor(Color.rgb(21, 27, 34));
+        previewPanel.setBackgroundColor(Color.rgb(17, 22, 34));
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         Button close = new Button(this);
-        close.setText("Back to editor");
-        close.setOnClickListener(view -> closePreview());
+        close.setText("Editor");
+        close.setOnClickListener(view -> closePreview(true));
         toolbar.addView(close);
-        Button toggle = new Button(this);
-        toggle.setText("Console");
-        toolbar.addView(toggle);
+        previewTitle = new TextView(this);
+        previewTitle.setTextColor(Color.WHITE);
+        previewTitle.setMaxLines(1);
+        previewTitle.setEllipsize(TextUtils.TruncateAt.END);
+        toolbar.addView(previewTitle, new LinearLayout.LayoutParams(0, -2, 1));
         previewPanel.addView(toolbar);
 
         preview = newWebView();
+        preview.getSettings().setCacheMode(android.webkit.WebSettings.LOAD_NO_CACHE);
         previewPanel.addView(preview, new LinearLayout.LayoutParams(-1, 0, 1));
+        if (!runner) wirePreviewConsole(toolbar);
+        root.addView(previewPanel);
+    }
+
+    private void wirePreviewConsole(LinearLayout toolbar) {
+        Button toggle = new Button(this);
+        toggle.setText("Console");
+        toolbar.addView(toggle);
         ScrollView consoleScroll = new ScrollView(this);
         TextView log = new TextView(this);
+        previewLog = log;
         log.setTextColor(Color.WHITE);
         log.setTypeface(android.graphics.Typeface.MONOSPACE);
         log.setPadding(12, 8, 12, 8);
-        log.setText("JavaScript console\n");
         consoleScroll.addView(log);
         consoleScroll.setVisibility(View.GONE);
         previewPanel.addView(consoleScroll, new LinearLayout.LayoutParams(-1,
-            Math.round(150 * getResources().getDisplayMetrics().density)));
+            Math.round(110 * getResources().getDisplayMetrics().density)));
         toggle.setOnClickListener(view -> consoleScroll.setVisibility(
             consoleScroll.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
         preview.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onConsoleMessage(ConsoleMessage message) {
-                String text = log.getText() + message.messageLevel().name() + " " +
-                    message.lineNumber() + "  " + TextUtils.ellipsize(message.message(), log.getPaint(), 2000,
-                        TextUtils.TruncateAt.END) + "\n";
-                log.setText(text.substring(Math.max(0, text.length() - 16000)));
-                consoleScroll.post(() -> consoleScroll.fullScroll(View.FOCUS_DOWN));
+                String line = message.message();
+                String text = log.getText() + message.messageLevel().name() + " " + message.lineNumber()
+                    + "  " + line.substring(0, Math.min(1000, line.length())) + "\n";
+                log.setText(text.substring(Math.max(0, text.length() - 12000)));
+                if (consoleScroll.getVisibility() == View.VISIBLE) {
+                    consoleScroll.post(() -> consoleScroll.fullScroll(View.FOCUS_DOWN));
+                }
                 return true;
             }
         });
         preview.setWebViewClient(new LocalClient(PREVIEW_HOST) {
             @Override WebResourceResponse response(String path) throws IOException {
-                if (path.isEmpty() || !files.has(path)) throw new IOException("Missing project file");
-                return new WebResourceResponse(mime(path), "UTF-8", 200, "OK", Collections.singletonMap(
-                    "Content-Security-Policy", "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; form-action 'none'; frame-src 'none'"),
-                    new ByteArrayInputStream(files.optString(path).getBytes(StandardCharsets.UTF_8)));
+                String file = previewFiles.optString(path, null);
+                if (file == null) throw new IOException("Missing project file");
+                java.util.Map<String, String> headers = new java.util.HashMap<>();
+                headers.put("Cache-Control", "no-store");
+                headers.put("Content-Security-Policy", "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; form-action 'none'; frame-src 'none'");
+                return new WebResourceResponse(mime(path), "UTF-8", 200, "OK", headers,
+                    new ByteArrayInputStream(file.getBytes(StandardCharsets.UTF_8)));
+            }
+
+            @Override public void onPageFinished(WebView view, String url) {
+                view.clearHistory();
             }
         });
-        ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
-            .hideSoftInputFromWindow(editor.getWindowToken(), 0);
-        editor.setVisibility(View.GONE);
-        root.addView(previewPanel);
-        preview.loadUrl("https://" + PREVIEW_HOST + "/" + Uri.encode(entry, "/"));
     }
 
-    private void closePreview() {
+    private void hideKeyboard() {
+        ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+            .hideSoftInputFromWindow(editor.getWindowToken(), 0);
+    }
+
+    private void layoutViewer() {
+        if (previewPanel == null) return;
+        boolean wide = split && getResources().getConfiguration().screenWidthDp >= 650;
+        root.setOrientation(wide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        editor.setVisibility(split ? View.VISIBLE : View.GONE);
+        editor.setLayoutParams(wide ? new LinearLayout.LayoutParams(0, -1, 1)
+            : new LinearLayout.LayoutParams(-1, 0, 3));
+        previewPanel.setLayoutParams(wide ? new LinearLayout.LayoutParams(0, -1, 1)
+            : new LinearLayout.LayoutParams(-1, 0, 2));
+    }
+
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        layoutViewer();
+    }
+
+    private void closePreview(boolean notifyEditor) {
         if (preview == null) return;
         root.removeView(previewPanel);
         previewPanel.removeView(preview);
         preview.destroy();
         previewPanel = null;
         preview = null;
+        previewLog = null;
+        previewFiles = new JSONObject();
+        root.setOrientation(LinearLayout.VERTICAL);
+        editor.setLayoutParams(new LinearLayout.LayoutParams(-1, -1));
         editor.setVisibility(View.VISIBLE);
+        if (notifyEditor) editor.evaluateJavascript("window.viewerClosed()", null);
     }
 
     @Override public void onBackPressed() {
-        if (preview != null) closePreview();
+        if (preview != null) closePreview(true);
         else super.onBackPressed();
     }
 
     @Override protected void onDestroy() {
-        closePreview();
+        closePreview(false);
         io.shutdown();
         root.removeView(editor);
         editor.destroy();

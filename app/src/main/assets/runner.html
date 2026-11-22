@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HexFlow Output</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 18px; background: #111622; color: #ece8ff; font: 15px system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  button { background: #25233c; color: inherit; border: 1px solid #4f486b; border-radius: 8px; padding: 8px 15px; }
+  pre { margin: 18px 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #d8d0ff; font-size: 14px; }
+</style>
+</head>
+<body>
+<header><span id="state" role="status">Preparing runtime…</span><button id="stop" disabled>Stop</button></header>
+<pre id="output" aria-label="Program output"></pre>
+<script src="runner.js"></script>
+</body>
+</html>
