@@ -5,11 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HexFlow Output</title>
 <style>
-  :root { color-scheme: dark; }
-  body { margin: 0; padding: 18px; background: #111622; color: #ece8ff; font: 15px system-ui, sans-serif; }
-  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  button { background: #25233c; color: inherit; border: 1px solid #4f486b; border-radius: 8px; padding: 8px 15px; }
-  pre { margin: 18px 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #d8d0ff; font-size: 14px; }
+  :root {
+    color-scheme: dark;
+    --page: #101b20; --surface: #1b2d34; --ink: #ecf4f2; --line: #2b434b; --accent: #c6ef9c;
+  }
+  :root.light {
+    color-scheme: light;
+    --page: #f2f5ef; --surface: #f9faf5; --ink: #1c302b; --line: #c8d7cd; --accent: #266247;
+  }
+  body { margin: 0; padding: 14px; background: var(--page); color: var(--ink); font: 14px system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+  [role="status"] { color: var(--accent); font-weight: 650; }
+  button {
+    min-height: 40px; background: var(--surface); color: inherit; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 15px;
+  }
+  button:disabled { opacity: .48; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+  pre {
+    margin: 0; min-height: 80px; padding: 12px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.55 ui-monospace, monospace;
+  }
 </style>
 </head>
 <body>

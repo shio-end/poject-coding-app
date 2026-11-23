@@ -6,7 +6,6 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
 <title>HexFlow</title>
 <link rel="stylesheet" href="vendor/codemirror.css">
-<link rel="stylesheet" href="vendor/material-darker.css">
 <link rel="stylesheet" href="vendor/show-hint.css">
 <link rel="stylesheet" href="workbench.css">
 </head>
@@ -15,51 +14,74 @@
   <span class="app-mark"></span><strong>HexFlow</strong><small>ShioliEnterprise @shi-end</small>
 </div>
 <header class="top">
-  <div class="brand"><span class="app-mark" aria-hidden="true"></span><strong>HexFlow</strong></div>
-  <div class="header-actions"><button id="palette" aria-label="Command palette" title="Command palette">⌘</button><button id="run" class="primary">▶ Run</button></div>
+  <div class="file-context">
+    <span id="fileTitle">No file open</span>
+    <span id="breadcrumb" class="breadcrumb" hidden></span>
+  </div>
+  <div class="header-actions">
+    <button id="palette" aria-label="Command palette" title="Command palette"><span aria-hidden="true">⌘</span><span class="command-label">Commands</span></button>
+    <button id="run" class="primary"><span class="play" aria-hidden="true"></span>Run</button>
+  </div>
 </header>
 <div class="viewbar">
   <div class="view-switch" role="group" aria-label="Workspace view">
-    <button data-view="editor" aria-pressed="true">Code</button><button data-view="split" aria-pressed="false">Split</button><button data-view="preview" aria-pressed="false">Preview</button>
+    <button data-view="editor" aria-pressed="true">Code</button>
+    <button data-view="split" aria-pressed="false">Split</button>
+    <button data-view="preview" aria-pressed="false">Preview</button>
   </div>
-  <label class="entry"><span class="sr-only">Preview page</span><select id="entry" aria-label="Preview page"></select></label>
+  <label class="entry"><span class="entry-label">Page</span><select id="entry" aria-label="Preview page"></select></label>
 </div>
-<nav class="tools" aria-label="Workspace tools">
-<button data-panel="files">Files</button><button data-panel="search">Search</button>
-<button data-panel="problems">Problems <span id="problemCount"></span></button><button data-panel="outline">Outline</button><button data-panel="project">Project</button><button data-panel="settings">Settings</button>
-</nav>
-<section id="files" class="panel" hidden>
-<div class="row"><button id="new">New file</button><button id="rename">Rename</button><button id="delete">Delete</button></div>
-<ul id="tree"></ul>
-</section>
-<section id="search" class="panel" hidden>
-<label>Find <input id="query" type="search" autocomplete="off"></label>
-<label>Replace <input id="replacement" autocomplete="off"></label>
-<div class="row"><button id="find">Next</button><button id="replace">Replace all in file</button><button id="findProject">Search project</button></div>
-<ul id="results"></ul>
-</section>
-<section id="problems" class="panel" hidden>
-<div class="row"><button id="check">Check file</button><button id="checkProject">Check project</button></div>
-<ul id="issues"></ul>
-</section>
-<section id="outline" class="panel" hidden><ul id="symbols"></ul></section>
-<section id="project" class="panel" hidden>
-<div class="row"><button id="import">Import file or ZIP</button><button id="export">Export ZIP</button><button id="save">Export file</button></div>
-</section>
-<section id="settings" class="panel" hidden>
-<label><input id="autoCheck" type="checkbox" checked> Check while typing</label>
-<label>Theme <select id="theme"><option value="material-darker">Dark</option><option value="default">Light</option></select></label>
-<label>Font size <input id="font" type="number" min="12" max="28" value="15"></label>
-</section>
 <div id="tabs" aria-label="Open files"></div>
-<div id="breadcrumb" class="breadcrumb"></div>
-<main id="editor" aria-label="Code editor"></main>
+<main id="editor" aria-label="Code editor">
+  <div id="emptyEditor" class="empty-editor" hidden><button id="openFiles">Open a file</button></div>
+</main>
+<aside id="toolDrawer" class="drawer" aria-labelledby="drawerTitle" hidden>
+  <header class="drawer-header"><h2 id="drawerTitle"></h2><button id="drawerClose" class="icon-button" aria-label="Close workspace tools">×</button></header>
+  <section id="files" class="panel" hidden>
+    <div class="row"><button id="new" class="primary">New file</button><button id="rename">Rename</button><button id="delete" class="danger">Delete</button></div>
+    <ul id="tree"></ul>
+  </section>
+  <section id="search" class="panel" hidden>
+    <div class="search-fields">
+      <label>Find <input id="query" type="search" autocomplete="off" placeholder="Search text"></label>
+      <label>Replace <input id="replacement" autocomplete="off" placeholder="Replacement text"></label>
+    </div>
+    <div class="row"><button id="find" class="primary">Next</button><button id="findProject">Search project</button><button id="replace">Replace all in file</button></div>
+    <ul id="results"></ul>
+  </section>
+  <section id="problems" class="panel" hidden>
+    <div class="row"><button id="check" class="primary">Check file</button><button id="checkProject">Check project</button></div>
+    <ul id="issues"></ul>
+  </section>
+  <section id="more" class="panel" hidden>
+    <div class="more-actions">
+      <button data-panel="outline" aria-controls="outline">Outline</button>
+      <button data-panel="project" aria-controls="project">Import &amp; export</button>
+      <button data-panel="settings" aria-controls="settings">Settings</button>
+    </div>
+  </section>
+  <section id="outline" class="panel" hidden><ul id="symbols"></ul></section>
+  <section id="project" class="panel" hidden>
+    <div class="row"><button id="import" class="primary">Import file or ZIP</button><button id="export">Export ZIP</button><button id="save">Export file</button></div>
+  </section>
+  <section id="settings" class="panel settings" hidden>
+    <div class="setting"><label for="theme">Theme</label><select id="theme"><option value="material-darker">Dark</option><option value="default">Light</option></select></div>
+    <div class="setting"><label for="font">Font size</label><input id="font" type="number" min="12" max="28" value="15"></div>
+    <div class="setting"><label for="autoCheck">Check while typing</label><input id="autoCheck" type="checkbox" checked></div>
+  </section>
+</aside>
 <nav class="keys" aria-label="Coding keys">
-<button id="indent">Tab</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="hint">Suggest</button>
-<button data-text="{">{</button><button data-text="}">}</button><button data-text="(">(</button><button data-text=")">)</button>
-<button data-text="[">[</button><button data-text="]">]</button><button data-text=";">;</button><button data-text="=">=</button><button data-text="&lt;">&lt;</button><button data-text="&gt;">&gt;</button>
+  <button id="indent">Tab</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="hint">Suggest</button>
+  <button data-text="{">{</button><button data-text="}">}</button><button data-text="(">(</button><button data-text=")">)</button>
+  <button data-text="[">[</button><button data-text="]">]</button><button data-text=";">;</button><button data-text="=">=</button><button data-text="&lt;">&lt;</button><button data-text="&gt;">&gt;</button>
 </nav>
 <footer><span id="language"></span><span id="status" role="status"></span><span id="position"></span></footer>
+<nav class="tools" aria-label="Workspace tools">
+  <button data-panel="files" aria-controls="files" aria-expanded="false">Files</button>
+  <button data-panel="search" aria-controls="search" aria-expanded="false">Search</button>
+  <button data-panel="problems" aria-controls="problems" aria-expanded="false">Problems <span id="problemCount" hidden></span></button>
+  <button data-panel="more" aria-controls="more" aria-expanded="false">More</button>
+</nav>
 <dialog id="fileDialog">
 <form method="dialog">
 <label id="fileLabel" for="fileName">File path</label>
@@ -68,7 +90,7 @@
 </form>
 </dialog>
 <dialog id="commandDialog">
-<label for="commandQuery">Command palette</label>
+<div class="dialog-heading"><label for="commandQuery">Command palette</label><button id="paletteClose" class="icon-button" aria-label="Close command palette">×</button></div>
 <input id="commandQuery" type="search" autocomplete="off" placeholder="Type a command or file">
 <ul id="commands"></ul>
 </dialog>

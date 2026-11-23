@@ -6,6 +6,7 @@ An offline Android code workspace for Android 8.0 and later, with a touch-first 
 
 ## Edit and preview
 
+- Use the bottom bar to open Files, Search, and Problems. More contains Outline, Import & export, and Settings, where you can choose the light or dark theme.
 - Choose **Code**, **Split**, or **Preview**. Pick the HTML entry page to render. In Split view, changes refresh the isolated preview after a short pause. The Console shows browser JavaScript logs and errors.
 - Edit files in tabs with line numbers, syntax highlighting, matching brackets, suggestions based on words in the current file, project search, and find and replace.
 - Open the command palette with **⌘** or **Ctrl+P**. It includes quick file opening, Go to Line, JSON formatting, project checking, and ZIP export. Outline lists recognized declarations and headings.

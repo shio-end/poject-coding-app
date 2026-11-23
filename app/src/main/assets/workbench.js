@@ -95,7 +95,7 @@ function render() {
   $('tabs').replaceChildren();
   for (const path of tabs) {
     const tab = document.createElement('div');
-    tab.className = 'tab';
+    tab.className = path === active ? 'tab current' : 'tab';
     const select = button(path.split('/').pop(), () => open(path));
     select.title = path;
     select.setAttribute('aria-pressed', String(path === active));
@@ -109,8 +109,15 @@ function render() {
     $('tabs').append(tab);
   }
   for (const id of ['rename', 'delete', 'save', 'find', 'replace']) $(id).disabled = !active;
-  $('breadcrumb').textContent = active ? active.split('/').join('  ›  ') : 'No file open';
+  const parts = active ? active.split('/') : [];
+  $('fileTitle').textContent = parts.pop() || 'No file open';
+  $('fileTitle').title = active || '';
+  $('breadcrumb').textContent = parts.join(' / ');
+  $('breadcrumb').hidden = parts.length === 0;
   $('language').textContent = active ? HexDiagnostics.extension(active).toUpperCase() : '';
+  $('emptyEditor').hidden = Boolean(active);
+  const currentTab = $('tabs').querySelector('.current');
+  if (currentTab) currentTab.scrollIntoView({block: 'nearest', inline: 'nearest'});
   updatePreviewEntries();
   position();
 }
@@ -130,11 +137,21 @@ function position() {
   const {line, ch} = editor.getCursor();
   $('position').textContent = active ? 'Ln ' + (line + 1) + ', Col ' + (ch + 1) : '';
 }
+const panelNames = {
+  files: 'Files', search: 'Search', problems: 'Problems', more: 'Workspace tools',
+  outline: 'Outline', project: 'Import & export', settings: 'Settings'
+};
 function panel(id) {
-  for (const control of document.querySelectorAll('[data-panel]')) {
+  $('toolDrawer').hidden = !id;
+  $('drawerTitle').textContent = panelNames[id] || '';
+  for (const section of $('toolDrawer').querySelectorAll('.panel')) {
+    section.hidden = section.id !== id;
+  }
+  for (const control of document.querySelectorAll('.tools [data-panel]')) {
     const selected = control.dataset.panel === id;
-    control.setAttribute('aria-pressed', String(selected));
-    $(control.dataset.panel).hidden = !selected;
+    control.setAttribute('aria-expanded', String(selected));
+    control.classList.toggle('current', selected ||
+      (control.dataset.panel === 'more' && ['outline', 'project', 'settings'].includes(id)));
   }
   if (id === 'outline') renderOutline();
   editor.refresh();
@@ -184,8 +201,10 @@ function suggest() {
   if (active) editor.showHint({hint: CodeMirror.hint.anyword, completeSingle: false});
 }
 function appearance() {
-  document.body.classList.toggle('light', $('theme').value === 'default');
-  editor.setOption('theme', $('theme').value);
+  const light = $('theme').value === 'default';
+  document.body.classList.toggle('light', light);
+  editor.setOption('theme', 'hexflow');
+  if (typeof AndroidBridge !== 'undefined') AndroidBridge.setLightTheme(light);
   const size = Math.min(28, Math.max(12, Number($('font').value) || 15));
   editor.getWrapperElement().style.fontSize = size + 'px';
   editor.refresh();
@@ -204,6 +223,23 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) persi
 for (const control of document.querySelectorAll('[data-panel]')) {
   control.onclick = () => panel($(control.dataset.panel).hidden ? control.dataset.panel : null);
 }
+$('openFiles').onclick = () => panel('files');
+$('paletteClose').onclick = () => $('commandDialog').close();
+$('drawerClose').onclick = () => {
+  const selected = document.querySelector('.tools .current');
+  panel(null);
+  if (selected) selected.focus();
+};
+window.dismissWorkspaceTools = () => {
+  const dialog = document.querySelector('dialog[open]');
+  if (dialog) {
+    dialog.close();
+    return true;
+  }
+  if ($('toolDrawer').hidden) return false;
+  panel(null);
+  return true;
+};
 for (const control of document.querySelectorAll('[data-text]')) {
   control.onpointerdown = event => event.preventDefault();
   control.onclick = () => { if (active) { editor.replaceSelection(control.dataset.text); editor.focus(); } };
@@ -359,6 +395,7 @@ function scheduleCheck() {
   clearTimeout(checkerTimer);
   checkGeneration++;
   editor.clearGutter('diagnostic-gutter');
+  $('problemCount').hidden = true;
   $('problemCount').textContent = '';
   $('issues').replaceChildren();
   if (active && $('autoCheck').checked) checkerTimer = setTimeout(() => checkFiles(false), 550);
@@ -391,7 +428,8 @@ async function checkFiles(project, explicit = false) {
   if (token !== checkGeneration) return;
   const list = $('issues');
   list.replaceChildren();
-  $('problemCount').textContent = results.length ? String(results.length) : '';
+  $('problemCount').hidden = results.length === 0;
+  $('problemCount').textContent = String(results.length);
   editor.clearGutter('diagnostic-gutter');
   for (const issue of results.slice(0, 200)) {
     listItem(list, button(issue.path + ':' + issue.line + ':' + issue.column + '  ' + issue.message,
@@ -481,9 +519,6 @@ $('check').onclick = () => checkFiles(false, true);
 $('checkProject').onclick = () => checkFiles(true, true);
 $('autoCheck').checked = previous.autoCheck !== false;
 $('autoCheck').onchange = () => { persist(); scheduleCheck(); };
-const icon = new Image();
-icon.onload = () => document.body.classList.add('has-art');
-icon.src = 'icon.webp';
 setTimeout(() => { $('splash').hidden = true; }, 1000);
 window.importProjectFiles = files => {
   let first;

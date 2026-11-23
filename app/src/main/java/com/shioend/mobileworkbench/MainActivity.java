@@ -3,7 +3,9 @@ package com.shioend.mobileworkbench;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -55,7 +57,9 @@ public final class MainActivity extends Activity {
     private WebView preview;
     private LinearLayout previewPanel;
     private volatile JSONObject previewFiles = new JSONObject();
+    private LinearLayout previewToolbar;
     private TextView previewTitle;
+    private boolean lightTheme;
     private TextView previewLog;
     private int revision;
     private boolean runtime;
@@ -74,8 +78,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(Color.rgb(21, 27, 34));
-        getWindow().setNavigationBarColor(Color.rgb(21, 27, 34));
+        applyNativeTheme();
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         setContentView(root);
@@ -156,6 +159,13 @@ public final class MainActivity extends Activity {
 
         @android.webkit.JavascriptInterface public void closeViewer() {
             runOnUiThread(() -> closePreview(false));
+        }
+
+        @android.webkit.JavascriptInterface public void setLightTheme(boolean light) {
+            runOnUiThread(() -> {
+                lightTheme = light;
+                applyNativeTheme();
+            });
         }
 
         @android.webkit.JavascriptInterface public void runCode(String language, String source) {
@@ -308,14 +318,14 @@ public final class MainActivity extends Activity {
         split = splitView;
         layoutViewer();
         if (hideKeyboard) hideKeyboard();
-        previewTitle.setText("LIVE  ·  " + entry);
+        previewTitle.setText("Live preview · " + entry);
         previewLog.setText("JavaScript console\n");
         preview.loadUrl("https://" + PREVIEW_HOST + "/" + Uri.encode(entry, "/") + "?revision=" + (++revision));
     }
 
     private void openRunner(String language, String source) {
         createViewer(true);
-        previewTitle.setText(language.toUpperCase(Locale.ROOT) + " OUTPUT");
+        previewTitle.setText(language + " output");
         split = false;
         layoutViewer();
         hideKeyboard();
@@ -336,7 +346,8 @@ public final class MainActivity extends Activity {
             @Override public void onPageFinished(WebView view, String url) {
                 if (!started && url.equals("https://" + RUNNER_HOST + "/runner.html")) {
                     started = true;
-                    view.evaluateJavascript(command, null);
+                    view.evaluateJavascript("document.documentElement.classList.toggle('light', " +
+                        lightTheme + ");" + command, null);
                 }
             }
         });
@@ -348,15 +359,18 @@ public final class MainActivity extends Activity {
         runtime = runner;
         previewPanel = new LinearLayout(this);
         previewPanel.setOrientation(LinearLayout.VERTICAL);
-        previewPanel.setBackgroundColor(Color.rgb(17, 22, 34));
         LinearLayout toolbar = new LinearLayout(this);
+        previewToolbar = toolbar;
+        toolbar.setPadding(dp(8), dp(4), dp(8), dp(4));
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         Button close = new Button(this);
-        close.setText("Editor");
+        close.setText("Back to code");
+        close.setAllCaps(false);
         close.setOnClickListener(view -> closePreview(true));
         toolbar.addView(close);
         previewTitle = new TextView(this);
-        previewTitle.setTextColor(Color.WHITE);
+        previewTitle.setTextSize(13);
+        previewTitle.setPadding(dp(8), 0, dp(8), 0);
         previewTitle.setMaxLines(1);
         previewTitle.setEllipsize(TextUtils.TruncateAt.END);
         toolbar.addView(previewTitle, new LinearLayout.LayoutParams(0, -2, 1));
@@ -367,16 +381,17 @@ public final class MainActivity extends Activity {
         previewPanel.addView(preview, new LinearLayout.LayoutParams(-1, 0, 1));
         if (!runner) wirePreviewConsole(toolbar);
         root.addView(previewPanel);
+        applyNativeTheme();
     }
 
     private void wirePreviewConsole(LinearLayout toolbar) {
         Button toggle = new Button(this);
         toggle.setText("Console");
+        toggle.setAllCaps(false);
         toolbar.addView(toggle);
         ScrollView consoleScroll = new ScrollView(this);
         TextView log = new TextView(this);
         previewLog = log;
-        log.setTextColor(Color.WHITE);
         log.setTypeface(android.graphics.Typeface.MONOSPACE);
         log.setPadding(12, 8, 12, 8);
         consoleScroll.addView(log);
@@ -414,6 +429,43 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void applyNativeTheme() {
+        int page = lightTheme ? 0xfff2f5ef : 0xff101b20;
+        int bar = lightTheme ? 0xfff9faf5 : 0xff142329;
+        int surface = lightTheme ? 0xffe8efe7 : 0xff1b2d34;
+        int text = lightTheme ? 0xff1c302b : 0xffecf4f2;
+        int border = lightTheme ? 0xffc8d7cd : 0xff2b434b;
+        getWindow().setStatusBarColor(bar);
+        getWindow().setNavigationBarColor(bar);
+        int flags = lightTheme ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0;
+        if (lightTheme && android.os.Build.VERSION.SDK_INT >= 26) flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        getWindow().getDecorView().setSystemUiVisibility(flags);
+        if (previewToolbar == null) return;
+        previewPanel.setBackgroundColor(page);
+        previewToolbar.setBackgroundColor(bar);
+        previewTitle.setTextColor(text);
+        if (previewLog != null) previewLog.setTextColor(text);
+        for (int index = 0; index < previewToolbar.getChildCount(); index++) {
+            View child = previewToolbar.getChildAt(index);
+            if (!(child instanceof Button)) continue;
+            Button button = (Button) child;
+            button.setTextColor(text);
+            button.setTextSize(12);
+            button.setMinimumHeight(dp(42));
+            button.setMinHeight(dp(42));
+            button.setPadding(dp(10), 0, dp(10), 0);
+            GradientDrawable shape = new GradientDrawable();
+            shape.setColor(surface);
+            shape.setStroke(dp(1), border);
+            shape.setCornerRadius(dp(8));
+            button.setBackground(new RippleDrawable(ColorStateList.valueOf(lightTheme ? 0x26266247 : 0x40c6ef9c), shape, null));
+        }
+    }
+
     private void hideKeyboard() {
         ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
             .hideSoftInputFromWindow(editor.getWindowToken(), 0);
@@ -441,6 +493,7 @@ public final class MainActivity extends Activity {
         previewPanel.removeView(preview);
         preview.destroy();
         previewPanel = null;
+        previewToolbar = null;
         preview = null;
         previewLog = null;
         previewFiles = new JSONObject();
@@ -451,8 +504,13 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (preview != null) closePreview(true);
-        else super.onBackPressed();
+        if (preview != null) {
+            closePreview(true);
+            return;
+        }
+        editor.evaluateJavascript("Boolean(window.dismissWorkspaceTools && window.dismissWorkspaceTools())", result -> {
+            if (!isFinishing() && !"true".equals(result)) super.onBackPressed();
+        });
     }
 
     @Override protected void onDestroy() {
