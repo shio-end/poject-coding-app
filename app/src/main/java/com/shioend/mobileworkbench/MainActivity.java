@@ -92,7 +92,8 @@ public final class MainActivity extends Activity {
         });
         editor.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
-                new AlertDialog.Builder(MainActivity.this).setMessage(message)
+                new AlertDialog.Builder(MainActivity.this, lightTheme ? R.style.HexFlowLightDialog : R.style.HexFlowDarkDialog)
+                    .setMessage(message)
                     .setPositiveButton("Delete", (dialog, which) -> result.confirm())
                     .setNegativeButton("Cancel", (dialog, which) -> result.cancel())
                     .setOnCancelListener(dialog -> result.cancel()).show();
@@ -434,11 +435,11 @@ public final class MainActivity extends Activity {
     }
 
     private void applyNativeTheme() {
-        int page = lightTheme ? 0xfff2f5ef : 0xff101b20;
-        int bar = lightTheme ? 0xfff9faf5 : 0xff142329;
-        int surface = lightTheme ? 0xffe8efe7 : 0xff1b2d34;
-        int text = lightTheme ? 0xff1c302b : 0xffecf4f2;
-        int border = lightTheme ? 0xffc8d7cd : 0xff2b434b;
+        int page = lightTheme ? 0xfff4f4f4 : 0xff141414;
+        int bar = lightTheme ? 0xfffafafa : 0xff1a1a1a;
+        int surface = lightTheme ? 0xffededed : 0xff262626;
+        int text = lightTheme ? 0xff171717 : 0xfff2f2f2;
+        int border = lightTheme ? 0xffb8b8b8 : 0xff4a4a4a;
         getWindow().setStatusBarColor(bar);
         getWindow().setNavigationBarColor(bar);
         int flags = lightTheme ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0;
@@ -462,7 +463,7 @@ public final class MainActivity extends Activity {
             shape.setColor(surface);
             shape.setStroke(dp(1), border);
             shape.setCornerRadius(dp(8));
-            button.setBackground(new RippleDrawable(ColorStateList.valueOf(lightTheme ? 0x26266247 : 0x40c6ef9c), shape, null));
+            button.setBackground(new RippleDrawable(ColorStateList.valueOf(lightTheme ? 0x26171717 : 0x40ffffff), shape, null));
         }
     }
 

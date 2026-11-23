@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 const storageKey = 'workbench.project.v1';
 const example = {
   'index.html': '<!doctype html>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>HexFlow demo</title>\n<link rel="stylesheet" href="style.css">\n<h1>Hello, HexFlow</h1>\n<button id="demo">Tap to test JavaScript</button>\n<script src="main.js"></script>\n',
-  'style.css': 'body { font: 18px system-ui; padding: 24px; color: #153b3b; }\nbutton { padding: 12px; }\n',
+  'style.css': 'body { font: 18px system-ui; padding: 24px; color: #222; }\nbutton { padding: 12px; }\n',
   'main.js': "document.querySelector('#demo').onclick = () => {\n  console.log('The app is running.');\n  document.querySelector('h1').textContent = 'It works!';\n};\n"
 };
 let previous = {};
