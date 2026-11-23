@@ -51,10 +51,11 @@ button, input, select {
   background: var(--surface); min-height: 40px; padding: 7px 11px;
 }
 button { cursor: pointer; }
-button:active { translate: 0 1px; }
+button:active { background-color: var(--surface-hover); }
 button:disabled { opacity: .47; cursor: default; translate: none; }
 :where(button, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+.primary:active { background-color: var(--accent); }
 .danger { color: var(--danger); }
 .top, .viewbar, .keys, footer, .drawer-header { display: flex; align-items: center; }
 .top, .viewbar { flex: none; justify-content: space-between; gap: 8px; background: var(--bar); padding: 7px 12px; }
@@ -80,7 +81,11 @@ button:disabled { opacity: .47; cursor: default; translate: none; }
   background: var(--page); border-bottom: 1px solid var(--line);
 }
 .tab { flex: none; display: flex; align-items: stretch; border-bottom: 2px solid transparent; }
-.tab.current { border-bottom-color: var(--accent); }
+.tab.current {
+  border-bottom-color: var(--accent);
+  background: var(--editor);
+  border-radius: 7px 7px 0 0;
+}
 .tab button { min-height: 36px; border: 0; background: transparent; font: 12px ui-monospace, monospace; color: var(--muted); }
 .tab button:first-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .tab button[aria-pressed="true"] { color: var(--ink); font-weight: bold; }
@@ -103,6 +108,7 @@ button:disabled { opacity: .47; cursor: default; translate: none; }
 .CodeMirror-hints { background: var(--bar); color: var(--ink); border-color: var(--line); }
 .CodeMirror-hint { color: var(--ink); }
 li.CodeMirror-hint-active { background: var(--accent); color: var(--accent-ink); }
+.jump-destination { background-color: var(--selected); }
 .diagnostic-gutter { width: 11px; }
 .diagnostic-marker { color: var(--danger); cursor: pointer; }
 .keys {
@@ -114,20 +120,51 @@ footer {
   background: var(--page); font: 11px ui-monospace, monospace;
 }
 #language { color: var(--selected-ink); }
+#status[data-state="saved"]::before, #status[data-state="saving"]::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 6px 1px 0;
+  border-radius: 50%; background: var(--accent);
+}
+#status[data-state="saving"]::before { border: 1px solid currentColor; background: transparent; }
 #status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #position { margin-left: auto; flex: none; }
 .tools {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex: none;
   gap: 4px; padding: 5px 8px; border-top: 1px solid var(--line); background: var(--bar);
 }
-.tools button { padding-inline: 3px; border-color: transparent; background: transparent; color: var(--muted); font-size: 13px; }
+.tools button { display: flex; align-items: center; justify-content: center; gap: 6px; padding-inline: 3px; border-color: transparent; background: transparent; color: var(--muted); font-size: 13px; }
 .tools button.current { background: var(--selected); color: var(--selected-ink); font-weight: 700; }
+.dock-icon {
+  display: inline-block; position: relative; flex: none; width: 14px; height: 14px;
+}
+.files-icon { height: 10px; border: 1.5px solid currentColor; border-radius: 2px; margin-top: 2px; }
+.files-icon::before {
+  content: ""; position: absolute; top: -4px; left: -1px; width: 6px; height: 3px;
+  border: 1.5px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0;
+}
+.search-icon { width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 50%; margin: -3px 3px 0 0; }
+.search-icon::after {
+  content: ""; position: absolute; width: 6px; height: 1.5px; background: currentColor;
+  top: 9px; left: 7px; transform: rotate(45deg);
+}
+.problems-icon { border: 1.5px solid currentColor; border-radius: 50%; }
+.problems-icon::before { content: ""; position: absolute; left: 5px; top: 2px; width: 2px; height: 5px; background: currentColor; }
+.problems-icon::after { content: ""; position: absolute; left: 5px; top: 8px; width: 2px; height: 2px; background: currentColor; }
+.more-icon::before {
+  content: ""; position: absolute; top: 6px; left: 1px; width: 3px; height: 3px;
+  border-radius: 50%; background: currentColor; box-shadow: 5px 0 currentColor, 10px 0 currentColor;
+}
 #problemCount { color: var(--danger); margin-left: 2px; font-size: 11px; font-weight: bold; }
 .drawer {
   display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0;
-  max-height: min(47dvh, 340px); background: var(--bar); border-top: 1px solid var(--line);
+  max-height: min(47dvh, 340px); overflow: hidden; background: var(--bar);
+  border-top: 1px solid var(--line); border-radius: 12px 12px 0 0;
 }
-.drawer-header { justify-content: space-between; padding: 3px 12px; border-bottom: 1px solid var(--line); }
+.drawer-header { position: relative; flex: none; touch-action: none; user-select: none;
+  justify-content: space-between; padding: 8px 12px 3px; border-bottom: 1px solid var(--line); }
+.drawer-header::before {
+  content: ""; position: absolute; top: 4px; left: calc(50% - 14px);
+  width: 28px; height: 3px; border-radius: 2px; background: var(--muted); opacity: .6;
+}
 .drawer-header h2 { margin: 0; font-size: 14px; }
 .icon-button { min-width: 40px; min-height: 35px; padding: 3px 7px; font-size: 19px; }
 .panel { overflow: auto; padding: 8px 12px; }
@@ -169,6 +206,33 @@ dialog::backdrop { background: #041013a8; }
 .splash small { color: #c2d4cd; font-size: 13px; }
 @keyframes splash-in { from { opacity: 0; transform: scale(.87); } to { opacity: 1; transform: scale(1); } }
 @keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: no-preference) {
+  button { transition: background-color 120ms ease-out, color 120ms ease-out, transform 90ms ease-out; }
+  button:not(:disabled):active { transform: scale(.97); }
+  .jump-destination { animation: pinpoint 650ms ease-out forwards; }
+  .tools button.current .dock-icon { animation: settle-icon 170ms ease-out; }
+  /* Modern WebViews can keep a closing dialog in the top layer until its fade ends. */
+  @supports (transition-behavior: allow-discrete) {
+    dialog, dialog::backdrop {
+      transition: opacity 140ms ease-out, transform 140ms ease-out,
+        display 140ms allow-discrete, overlay 140ms allow-discrete;
+    }
+    dialog { opacity: 0; transform: translateY(8px); }
+    dialog::backdrop { opacity: 0; }
+    dialog[open] { opacity: 1; transform: none; }
+    dialog[open]::backdrop { opacity: 1; }
+    dialog:not([open]), dialog:not([open])::backdrop { pointer-events: none; }
+    @starting-style {
+      dialog[open] { opacity: 0; transform: translateY(8px); }
+      dialog[open]::backdrop { opacity: 0; }
+    }
+  }
+}
+@keyframes pinpoint { 35% { opacity: 1; } to { opacity: 0; } }
+@keyframes settle-icon { from { transform: translateY(2px); } to { transform: none; } }
+@media (max-width: 350px) {
+  .tools button { column-gap: 3px; font-size: 12px; flex-wrap: wrap; }
+}
 @media (prefers-reduced-motion: reduce) { .splash, .splash .app-mark { animation: none; } }
 @media (max-width: 420px) { .command-label, .entry-label { display: none; } }
 @media (max-width: 300px) {

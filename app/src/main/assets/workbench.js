@@ -61,7 +61,10 @@ function validPath(path) {
 function contents() {
   return Object.fromEntries([...documents].map(([path, doc]) => [path, doc.getValue()]));
 }
-function status(message) { $('status').textContent = message; }
+function status(message, state = '') {
+  $('status').textContent = message;
+  $('status').dataset.state = state;
+}
 function persist() {
   clearTimeout(pendingSave);
   try {
@@ -69,7 +72,7 @@ function persist() {
       files: contents(), tabs, active, theme: $('theme').value, font: $('font').value,
       previewEntry, autoCheck: $('autoCheck').checked
     }));
-    status('Saved on this device');
+    status('Saved on this device', 'saved');
   } catch (error) {
     status('Storage is full. Export a ZIP to keep your changes.');
   }
@@ -85,7 +88,14 @@ function listItem(parent, child) {
   li.append(child);
   parent.append(li);
 }
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
 function render() {
+  const tabStrip = $('tabs');
+  const oldLeft = new Map();
+  if (!reducedMotion.matches) {
+    for (const tab of tabStrip.children) oldLeft.set(tab.dataset.path, tab.getBoundingClientRect().left);
+  }
   $('tree').replaceChildren();
   for (const path of [...documents.keys()].sort()) {
     const item = button(path, () => { open(path); panel(null); });
@@ -95,6 +105,7 @@ function render() {
   $('tabs').replaceChildren();
   for (const path of tabs) {
     const tab = document.createElement('div');
+    tab.dataset.path = path;
     tab.className = path === active ? 'tab current' : 'tab';
     const select = button(path.split('/').pop(), () => open(path));
     select.title = path;
@@ -118,6 +129,21 @@ function render() {
   $('emptyEditor').hidden = Boolean(active);
   const currentTab = $('tabs').querySelector('.current');
   if (currentTab) currentTab.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  if (oldLeft.size) {
+    for (const tab of tabStrip.children) {
+      const previous = oldLeft.get(tab.dataset.path);
+      if (previous === undefined) {
+        tab.animate([{opacity: 0, transform: 'translateY(4px)'}, {opacity: 1, transform: 'none'}],
+          {duration: 145, easing: 'ease-out'});
+      } else {
+        const offset = previous - tab.getBoundingClientRect().left;
+        if (Math.abs(offset) > 1 && Math.abs(offset) < tabStrip.clientWidth) {
+          tab.animate([{transform: 'translateX(' + offset + 'px)'}, {transform: 'none'}],
+            {duration: 150, easing: 'ease-out'});
+        }
+      }
+    }
+  }
   updatePreviewEntries();
   position();
 }
@@ -131,7 +157,7 @@ function open(path) {
   persist();
   scheduleCheck();
   queuePreview();
-  if (!$('outline').hidden) renderOutline();
+  if (activePanel === 'outline') renderOutline();
 }
 function position() {
   const {line, ch} = editor.getCursor();
@@ -141,11 +167,34 @@ const panelNames = {
   files: 'Files', search: 'Search', problems: 'Problems', more: 'Workspace tools',
   outline: 'Outline', project: 'Import & export', settings: 'Settings'
 };
-function panel(id) {
-  $('toolDrawer').hidden = !id;
-  $('drawerTitle').textContent = panelNames[id] || '';
-  for (const section of $('toolDrawer').querySelectorAll('.panel')) {
-    section.hidden = section.id !== id;
+let activePanel = null;
+let drawerAnimation = null;
+let drag = null;
+
+function panel(id, settle = false) {
+  if (id === activePanel && !settle) return;
+  const drawer = $('toolDrawer');
+  const from = drawer.getBoundingClientRect().height;
+  const previousPanel = activePanel;
+  activePanel = id;
+  drag = null;
+  drawer.style.removeProperty('height');
+  if (drawerAnimation) {
+    drawerAnimation.cancel();
+    drawerAnimation = null;
+  }
+  if (id) {
+    drawer.hidden = false;
+    drawer.inert = false;
+    drawer.removeAttribute('aria-hidden');
+    $('drawerTitle').textContent = panelNames[id];
+    for (const section of drawer.querySelectorAll('.panel')) section.hidden = section.id !== id;
+    if (id === 'outline') renderOutline();
+  } else {
+    const selected = document.querySelector('.tools .current');
+    if (selected && drawer.contains(document.activeElement)) selected.focus({preventScroll: true});
+    drawer.inert = true;
+    drawer.setAttribute('aria-hidden', 'true');
   }
   for (const control of document.querySelectorAll('.tools [data-panel]')) {
     const selected = control.dataset.panel === id;
@@ -153,9 +202,48 @@ function panel(id) {
     control.classList.toggle('current', selected ||
       (control.dataset.panel === 'more' && ['outline', 'project', 'settings'].includes(id)));
   }
-  if (id === 'outline') renderOutline();
-  editor.refresh();
+  const to = id ? drawer.getBoundingClientRect().height : 0;
+  const finish = () => {
+    drawer.hidden = !id;
+    drawerAnimation = null;
+    editor.refresh();
+  };
+  if (reducedMotion.matches || Math.abs(to - from) < 1) {
+    finish();
+  } else {
+    const animation = drawer.animate([{height: from + 'px'}, {height: to + 'px'}], {
+      duration: id ? 170 : 125, easing: 'cubic-bezier(.2,.75,.25,1)'
+    });
+    drawerAnimation = animation;
+    animation.onfinish = () => { if (animation === drawerAnimation) finish(); };
+  }
+  if (previousPanel && id && previousPanel !== id && !reducedMotion.matches) {
+    $(id).animate([{opacity: 0.4, transform: 'translateY(3px)'}, {opacity: 1, transform: 'none'}],
+      {duration: 130, easing: 'ease-out'});
+  }
 }
+
+const drawerHeader = $('toolDrawer').querySelector('.drawer-header');
+drawerHeader.addEventListener('pointerdown', event => {
+  if (!activePanel || !event.isPrimary || event.button !== 0 || event.target.closest('button')) return;
+  if (drawerAnimation) drawerAnimation.finish();
+  drag = {pointer: event.pointerId, y: event.clientY, height: $('toolDrawer').getBoundingClientRect().height};
+  drawerHeader.setPointerCapture(event.pointerId);
+});
+drawerHeader.addEventListener('pointermove', event => {
+  if (!drag || drag.pointer !== event.pointerId) return;
+  const travel = Math.max(0, event.clientY - drag.y);
+  $('toolDrawer').style.height = Math.max(drawerHeader.offsetHeight, drag.height - travel) + 'px';
+});
+function endDrawerDrag(event) {
+  if (!drag || drag.pointer !== event.pointerId) return;
+  const dismiss = event.type === 'pointerup' && event.clientY - drag.y > Math.min(48, drag.height / 3);
+  panel(dismiss ? null : activePanel, true);
+}
+drawerHeader.addEventListener('pointerup', endDrawerDrag);
+drawerHeader.addEventListener('pointercancel', endDrawerDrag);
+drawerHeader.addEventListener('lostpointercapture', endDrawerDrag);
+
 function editPath(path) {
   const dialog = $('fileDialog');
   $('fileLabel').textContent = path ? 'Rename file' : 'New file path';
@@ -213,15 +301,15 @@ function appearance() {
 editor.on('cursorActivity', position);
 editor.on('change', () => {
   clearTimeout(pendingSave);
-  status('Saving…');
+  status('Saving…', 'saving');
   pendingSave = setTimeout(persist, 250);
   scheduleCheck();
   queuePreview();
-  if (!$('outline').hidden) renderOutline();
+  if (activePanel === 'outline') renderOutline();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
 for (const control of document.querySelectorAll('[data-panel]')) {
-  control.onclick = () => panel($(control.dataset.panel).hidden ? control.dataset.panel : null);
+  control.onclick = () => panel(activePanel === control.dataset.panel ? null : control.dataset.panel);
 }
 $('openFiles').onclick = () => panel('files');
 $('paletteClose').onclick = () => $('commandDialog').close();
@@ -236,7 +324,7 @@ window.dismissWorkspaceTools = () => {
     dialog.close();
     return true;
   }
-  if ($('toolDrawer').hidden) return false;
+  if (!activePanel) return false;
   panel(null);
   return true;
 };
@@ -368,12 +456,28 @@ function runActive() {
   persist();
   AndroidBridge.runCode(runtime, source);
 }
+let highlightedLine;
+let highlightTimer;
+function highlightDestination(line) {
+  clearTimeout(highlightTimer);
+  if (highlightedLine) {
+    highlightedLine.doc.removeLineClass(highlightedLine.handle, 'background', 'jump-destination');
+  }
+  const doc = editor.getDoc();
+  const handle = doc.addLineClass(line, 'background', 'jump-destination');
+  highlightedLine = {doc, handle};
+  highlightTimer = setTimeout(() => {
+    doc.removeLineClass(handle, 'background', 'jump-destination');
+    highlightedLine = null;
+  }, 650);
+}
 function navigateTo(path, line, column = 1) {
   open(path);
   panel(null);
   const position = {line: line - 1, ch: column - 1};
   editor.setCursor(position);
   editor.scrollIntoView(position, 30);
+  highlightDestination(editor.getCursor().line);
   editor.focus();
 }
 function renderOutline() {
